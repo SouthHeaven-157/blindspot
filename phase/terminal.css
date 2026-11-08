@@ -10,3 +10,29 @@
 
 
 #healthInterrupted{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;background:#050813e8;color:#ffb9bf;font:18px "Microsoft YaHei",sans-serif;letter-spacing:2px;backdrop-filter:blur(8px)}
+
+.decrypt-console{display:block!important;max-height:65vh;overflow:auto}
+.decrypt-console p{font-size:13px;line-height:1.7;color:#c3dedc}
+.decrypt-console button{width:100%;padding:10px!important;margin:5px 0;border:1px solid #44766f;background:#102c35;color:#baffeb;text-align:left;font:12px Consolas,monospace}
+.decrypt-console button:disabled{opacity:.35}
+.decrypt-console input{width:100%;box-sizing:border-box;border:1px solid #729eaf;background:#030c18;padding:12px;color:#aeffe0;font:16px Consolas,monospace}
+.decrypt-command{white-space:pre-wrap;overflow-wrap:anywhere;background:#020a13;color:#83ffdb;padding:12px;font:12px/1.8 Consolas,monospace}
+.packet-slots,.bit-row{display:flex;gap:4px;flex-wrap:wrap}.bit-row{flex-wrap:nowrap}.bit-row button{text-align:center;flex:1;padding:8px 2px!important}
+.packet-slots button{width:auto}.bit-row button[aria-pressed=true]{background:#286e61;color:white}
+.decrypt-feedback{color:#f2c57f!important}
+#overlay .introCard{position:relative;width:min(1160px,94vw);max-width:none;max-height:94vh;overflow:auto;padding:40px 38px 32px 48%;box-sizing:border-box;background:linear-gradient(110deg,#050c1790,#070b1be8);border:1px solid #365668}
+#overlay .introOrbitWrap{position:absolute;left:0;top:10%;width:47%;height:72%;pointer-events:none}
+#introOrbit{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 35px #36cfeb55);transition:transform 1.2s,filter 1.2s;animation:orbitWake 2.2s ease-out both}
+#overlay .introBoss{position:absolute;left:20px;right:20px;bottom:0;background:#071827c9;border-left:2px solid #76efd8;padding:18px}
+#overlay .introBoss b{font-size:16px;line-height:1.8;display:block;color:#d6fff6}
+#overlay .introCard h2{font-size:clamp(28px,3.4vw,48px);line-height:1.2;letter-spacing:2px}
+#overlay #introDialogue{font-size:17px;line-height:1.9;color:#e3f2f0;min-height:145px}
+#overlay .briefGrid{display:none}
+#overlay .introCard>p:not(#introDialogue):not(.sub){display:none}
+#overlay .introCard[data-briefing="1"] #introOrbit{transform:scale(1.15) rotate(12deg);filter:drop-shadow(0 0 45px #e2447066) hue-rotate(85deg)}
+#overlay .introCard[data-briefing="2"] #introOrbit{transform:scale(.9) rotate(-18deg);filter:drop-shadow(0 0 55px #5affa888)}
+.briefing-reveal #introDialogue,.briefing-reveal h2{animation:briefingText .75s ease-out both}
+@keyframes orbitWake{from{opacity:0;transform:scale(.15) rotate(-100deg);filter:blur(18px)}to{opacity:1;transform:scale(1);filter:blur(0)}}
+@keyframes briefingText{from{opacity:0;transform:translateY(15px);filter:blur(6px)}to{opacity:1;transform:translateY(0);filter:blur(0)}}
+@media(max-width:750px){#overlay .introCard{padding:20px}#overlay .introOrbitWrap{position:relative;top:auto;width:100%;height:220px}#overlay .introBoss{display:none}#overlay #introDialogue{font-size:14px;min-height:0}}
+@media(prefers-reduced-motion:reduce){#introOrbit,.briefing-reveal #introDialogue,.briefing-reveal h2{animation:none;transition:none}}

@@ -1,11 +1,12 @@
+import {mountDecrypt} from "./decrypt.mjs";
 import * as THREE from "three";
 
 const clamp=THREE.MathUtils.clamp;
 const smooth=t=>t*t*(3-2*t);
 const records=[
  {title:"01 / 事发现场",code:"INCIDENT_07.LOG",body:"02:13:44　街区电力先于档案接驳上线。\n02:13:45　维护端口出现一次合法写入。\n02:13:47　身份 A-017 被标记为已注销。\n\n现场记录没有删除，只是被转移到了另一位面。"},
- {title:"02 / 身份档案",code:"IDENTITY_A-017",body:"姓名：［已遮蔽］\n权限：市政记忆维护 / 三级\n状态：待一次性签名\n\n你可以带走完整记忆，也可以只带走身份已经注销的证明。两种选择都会打开撤离路线。"},
- {title:"03 / 签名权限",code:"ONE_WRITE.KEY",body:"签名剩余：01\n回滚：不可用\n复制：下载完整档案，提升追踪热度。\n注销：降低视觉识别范围，保留运动传感器风险。\n\n确认后，记录将写入你的义眼。"}
+ {title:"02 / 身份档案",code:"IDENTITY_A-017",body:"姓名：［已遮蔽］\n权限：市政记忆维护 / 三级\n状态：待一次性签名\n\nCIVIC MEMORY 将所有拒绝意识上传的人类列为待清除对象。你的任务是带走原始名单及签名证据。"},
+ {title:"03 / 签名权限",code:"ONE_WRITE.KEY",body:"签名剩余：01\n回滚：不可用\n复制：下载完整档案，提升追踪热度。\n目标文件：HUMAN_PURGE。完成下载后，人类阵营将开启数据流接收通道。\n\n确认后，记录将写入你的义眼。"}
 ];
 
 function neonMaterial(color,intensity=2.5){
@@ -108,7 +109,7 @@ export class DataSpace{
   const archive=this.kind==="archive",wall=this.kind==="wall",terminal=this.kind==="key"?"维护密钥终端":"巡逻轮换终端";
   this.ui.classList.toggle("wall-mode",wall);
   this.ui.querySelector("#dataKicker").textContent=wall?"TERMINAL FIREWALL / THREE LAYERS":archive?"ONE WRITE / ARCHIVE VIEWER":"ZERO DAY / HACKER TERMINAL";
-  this.ui.querySelector("#dataTitle").textContent=wall?"终端数据墙 / 03":archive?"身份档案 / A-017":terminal;
+  this.ui.querySelector("#dataTitle").textContent=wall?"终端数据墙 / 03":archive?"机密档案 / HUMAN PURGE":terminal;
   this.ui.querySelector("#dataDescription").textContent=wall?"三条协议通道轮流开放。在亮起时点击对应通道，逐层瓦解防火墙。":archive?"立体档案柜已联机。查看三份记录，然后提交唯一签名。":this.kind==="intercept"?"核心投影给出 B → C → A。按顺序写入数据片段，生成连接命令。":"校验式为 5A XOR 69。计算结果并选择有效的 M-09 执行命令。";
   this.ui.querySelector("#recordViewer").style.display=archive?"block":"none";this.ui.querySelector(".terminalReadout").style.display=archive?"none":"block";
   this.ui.querySelector(".terminalReadout>span").textContent=wall?"FIREWALL / OPEN CHANNEL":"INJECTION VECTOR";
@@ -118,16 +119,16 @@ export class DataSpace{
   const tabs=this.ui.querySelector(".recordTabs");tabs.replaceChildren();
   if(archive)records.forEach((record,index)=>{const button=document.createElement("button");button.textContent=record.title;button.onclick=()=>this.selectRecord(index);tabs.append(button);});
   this.selectRecord(0);
-  const actions=this.ui.querySelector(".dataActions");actions.replaceChildren();this.wallButtons=[];
+  const actions=this.ui.querySelector(".dataActions");actions.replaceChildren();actions.classList.remove("decrypt-console");this.wallButtons=[];
   this.shields.forEach(shield=>shield.visible=wall);this.orbits.forEach(ring=>ring.visible=true);
   if(wall){
    ["缓存通道","索引通道","签名通道"].forEach((title,index)=>this.addChannel(index,title));
   }else if(archive){
    this.addAction("copy","窃取《人类清除名单》","提交唯一签名 · 下载完成后启动数据流撤离");
   }else if(this.kind==="intercept"){
-   this.puzzleOrder=[1,2,0];["A / LINK","B / PHASE","C / ROOT"].forEach((title,index)=>this.addPuzzle(index,title,"写入数据片段"));
+   this.mountDecryption(actions);
   }else if(this.kind==="key"){
-   ["0x3C","0x33","0x31"].forEach(value=>this.addPuzzle(value,"exec M-09 --checksum="+value,"执行校验命令"));
+   this.mountDecryption(actions);
   }else this.addAction("hack","执行零日注入","OCULAR PAYLOAD / 约 2 秒");
   this.ui.querySelector(".dataLog").textContent=wall?"[01] 数据墙已接入。\n[02] 等待第一条开放通道。":"[01] 数据空间已稳定。\n[02] 立体档案索引加载完成。";
  }
@@ -140,22 +141,12 @@ export class DataSpace{
   const button=document.createElement("button");button.dataset.action=value;button.innerHTML="<b></b><span></span>";button.querySelector("b").textContent=title;button.querySelector("span").textContent=subtitle;
   button.onclick=()=>this.beginAction(value);this.ui.querySelector(".dataActions").append(button);
  }
- addPuzzle(value,title,subtitle){
-  const button=document.createElement("button");button.dataset.puzzle=value;button.innerHTML="<b></b><span></span>";button.querySelector("b").textContent=title;button.querySelector("span").textContent=subtitle;button.onclick=()=>this.choosePuzzle(value);this.ui.querySelector(".dataActions").append(button);
- }
- choosePuzzle(value){
-  if(this.phase!=="inspect")return;
-  if(this.kind==="intercept"){
-   const expected=this.puzzleOrder[this.puzzleProgress];
-   if(value!==expected){this.puzzleProgress=0;this.ui.querySelector(".dataLog").textContent="[错误] 片段顺序冲突，序列已清空。\n请按照 B → C → A 重新写入。";return;}
-   this.puzzleProgress++;this.ui.querySelector("#dataConnection").textContent="SEQUENCE "+this.puzzleProgress+" / 03";
-   if(this.puzzleProgress<3){this.ui.querySelector(".dataLog").textContent="[接受] 数据片段已写入，等待下一段。";return;}
-   this.command="phase --attach sector07 --channel=GHOST";
-  }else if(this.kind==="key"){
-   if(value!=="0x33"){this.ui.querySelector(".dataLog").textContent="[拒绝] 校验值不匹配。重新计算 5A XOR 69。";return;}
-   this.command="exec M-09 --checksum=0x33";
-  }else return;
-  this.ui.querySelector(".dataLog").textContent="$ "+this.command;this.beginAction("decoded");
+ mountDecryption(actions){
+  this.ui.querySelector("#dataDescription").textContent=this.kind==="intercept"?"恢复链路，解出加密信道，再向物理端口写入授权。":"验证动态挑战，构造能通过 M-09 的执行签名。";
+  this.ui.querySelector(".terminalReadout>b").textContent=this.kind==="intercept"?"PACKET ROUTING / CIPHER":"XOR / ROTATE / SIGN";
+  mountDecrypt(actions,this.kind,()=>this.phase==="inspect",command=>{
+   this.command=command;this.beginAction("decoded");
+  });
  }
  addChannel(index,title){
   const button=document.createElement("button");button.dataset.channel=index;button.innerHTML="<b></b><span></span>";button.querySelector("b").textContent=String.fromCharCode(65+index)+" / "+title;button.querySelector("span").textContent="等待协议状态";

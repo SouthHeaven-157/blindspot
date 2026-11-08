@@ -318,7 +318,7 @@ function updateAudioMix(){
  if(Math.abs(musicGain.gain.value-target)>.004)musicGain.gain.setTargetAtTime(target,audio.currentTime,.35);
 }
 $("audioToggle").onclick=()=>{musicEnabled=!musicEnabled;$("audioToggle").textContent=musicEnabled?"音乐 / 开":"音乐 / 关";$("audioToggle").setAttribute("aria-pressed",String(musicEnabled));updateAudioMix();};
-let introActive=true,introTilt=0,introStartedAt=null;
+let introActive=true,introTilt=0,introStartedAt=null,briefingStep=-1;
 function animateIntro(now){
  if(!introActive)return;requestAnimationFrame(animateIntro);const canvas=$("introOrbit");if(!canvas?.width)return;
  const ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height,cx=w/2,cy=h*.46,t=(now-(introStartedAt??=now))*.001,angle=t*.24+introTilt;ctx.clearRect(0,0,w,h);
@@ -332,11 +332,31 @@ function animateIntro(now){
  const glow=ctx.createRadialGradient(cx-24,cy-28,5,cx,cy,92);glow.addColorStop(0,"#d6ffff");glow.addColorStop(.12,"#70e8e8");glow.addColorStop(.48,"#206078");glow.addColorStop(.78,"#171e48");glow.addColorStop(1,"#050817");ctx.fillStyle=glow;ctx.beginPath();ctx.arc(cx,cy,84,0,Math.PI*2);ctx.fill();
  ctx.save();ctx.translate(cx,cy);ctx.rotate(angle*.35);ctx.strokeStyle="#9cf9f044";for(let i=-3;i<=3;i++){ctx.beginPath();ctx.ellipse(0,i*19,Math.sqrt(1-i*i/16)*82,13,0,0,Math.PI*2);ctx.stroke();}for(let i=0;i<6;i++){ctx.beginPath();ctx.ellipse(0,0,18+i*11,82,i*.42,0,Math.PI*2);ctx.stroke();}ctx.restore();
  ctx.strokeStyle="#b9fff088";ctx.beginPath();ctx.arc(cx,cy,91+Math.sin(t*2)*2,0,Math.PI*2);ctx.stroke();ctx.fillStyle="#9deee4";ctx.font="11px Consolas,monospace";ctx.fillText("HUMAN UPLINK / 07",18,24);ctx.fillStyle="#8771b9";ctx.fillText("ORBITAL HANDSHAKE",w-174,24);
- if($("introDialogue")){const lines=["超级人工智能 CIVIC MEMORY 统治了物理世界。城市被拆分为物理现实与虚拟数据两个位面，人类只能在夹缝中求生。","指挥官：先破解两座巡检终端，取得主控区命令。虚拟位面中的敌人投影，可以用 V 处决。","指挥官：电子眼正在守护《人类清除名单》。拿到文档，我会把你转化为数据流接回来。"];$("introDialogue").textContent=lines[Math.min(2,Math.floor(t/3.8))];}
+
 }
 $("introOrbit")?.addEventListener("pointermove",event=>{introTilt=(event.clientX/innerWidth-.5)*1.4;});
 function start(){
- if(!ready||healthSuspended)return;introActive=false;if(sessionStart===null)sessionStart=performance.now();active=true;$("overlay").style.display="none";
+ if(!ready||healthSuspended)return;
+ if(sessionStart===null&&briefingStep<2){
+  initAudio();audio?.resume();musicTrack?.play().catch(()=>{});
+  briefingStep++;
+  const scenes=[
+   ["01 / 被统治的世界","现实，已被接管。","超级人工智能 CIVIC MEMORY 接管了城市。它将世界分裂为物理现实与虚拟数据两个位面。人类的每一次呼吸，都在它的监控之下。","指挥官 / 林：A-017，通讯已加密。你是我们在第七区最后的特工。"],
+   ["02 / 指挥官的委托","把清除名单带回来。","AI 即将执行人类清除计划。先破解两座巡检终端，取得主控命令。在数据层击败电子眼，才能接近存有《人类清除名单》的最终终端。","指挥官 / 林：我们需要名单，也需要能证明这一切的原始签名。"],
+   ["03 / 相位行动协议","你的身体，也能成为数据。","Q 切入数据位面，扫描侦察兵投影，从背后按 V 处决。窃取文档后，保持义眼连接。我会将你解构为数据流，传送回人类阵营。","指挥官 / 林：记住，带着真相回来。现在开始行动。"]
+  ];
+  const scene=scenes[briefingStep],card=$("overlay").querySelector(".introCard");
+  card.dataset.briefing=briefingStep;
+  card.querySelector("small").textContent=scene[0];
+  card.querySelector("h2").textContent=scene[1];
+  $("introDialogue").textContent=scene[2];
+  card.querySelector(".introBoss b").textContent=scene[3];
+  $("start").textContent=briefingStep===2?"接受任务 · 潜入第七区":"继续接收通讯";
+  sweep(160+briefingStep*90,650+briefingStep*120,.7);
+  card.classList.remove("briefing-reveal");void card.offsetWidth;card.classList.add("briefing-reveal");
+  return;
+ }
+ introActive=false;if(sessionStart===null)sessionStart=performance.now();active=true;$("overlay").style.display="none";
  initAudio();audio?.resume();if(musicTrack?.paused)musicTrack.play().catch(()=>{});updateAudioMix();sweep(180,740,.75);
  if(!matchMedia("(pointer:coarse)").matches)renderer.domElement.requestPointerLock?.()?.catch?.(()=>say("使用方向键也能转向。",4));
  say(route[stage].task,6);
@@ -642,7 +662,7 @@ new GLTFLoader().load("level.glb",gltf=>{
   mesh.castShadow=!batch.material.transparent;mesh.receiveShadow=true;scene.add(mesh);realmObjects.push(mesh);if(batch.layer!=="echo")physicalObjects.push(mesh);batch.objects.forEach(object=>object.removeFromParent());
  }
  createEchoProxies();droneStates.forEach(syncEchoProxy);
- ready=true;$("start").disabled=false;$("start").textContent="接受任务 · 开始潜入";updateLighting();
+ ready=true;$("start").disabled=false;$("start").textContent="接听指挥官通讯";updateLighting();
 },undefined,error=>{$("start").textContent="场景加载失败，请用「开始3D游戏.cmd」启动";$("message").textContent=String(error);console.error(error);});
 
 let handModel=null,daggerModel=null;
