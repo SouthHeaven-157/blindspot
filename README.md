@@ -33,3 +33,9 @@ phase/game.js 为游戏主逻辑，phase/data-space.mjs 为终端解密，phase/
 
 外部生命归零会暂停战斗，宿主可通过 set 或 heal 恢复生命。
 当前预留生命接口，尚未接入赛事平台的正式接档与交档 SDK。
+
+## GitHub Pages
+
+在仓库 Settings → Pages 中选择 Deploy from a branch，分支 main，目录 / (root)。入口为根目录 index.html，资源通过相对路径 ./phase/ 加载，支持仓库子路径。
+
+预计地址 https://southheaven-157.github.io/-/ ，需先在仓库启用 Pages。
