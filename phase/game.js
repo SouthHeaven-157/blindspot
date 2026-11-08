@@ -1,3 +1,4 @@
+import {createRelay} from "./relay.mjs";
 import {route} from "./mission.mjs";
 import {PhaseEffect} from "./phase-effect.mjs";
 import {defaults,openCodeEditor} from "./world-code.mjs";
@@ -83,7 +84,9 @@ function showOcularCutin(next){
  clearTimeout(ocularTimer);overlay.classList.remove("engaged");void overlay.offsetWidth;overlay.classList.add("engaged");overlay.setAttribute("aria-hidden","false");
  ocularTimer=setTimeout(()=>{overlay.classList.remove("engaged");overlay.setAttribute("aria-hidden","true");},1150);
 }
-let playerHealth=100,playerHealthMax=100,externalHealth=false,healthSuspended=false,healthResumeActive=false;const healthListeners=new Set();
+const relayEmbedded=window.parent!==window;
+let relayPaused=false,relayEnded=false,relayResumeActive=false,relayReady=false,relayAssist=0,passiveAttack=0,passiveSanity=0,missionEnteredAt=null;
+let playerHealth=relayEmbedded?0:100,playerHealthMax=relayEmbedded?1:100,externalHealth=relayEmbedded,healthSuspended=false,healthResumeActive=false;const healthListeners=new Set();
 function updateHealthUI(){
  if(!$("healthBar"))return;$("healthBar").style.width=(playerHealth/playerHealthMax*100)+"%";$("healthValue").textContent=Math.ceil(playerHealth)+" / "+playerHealthMax;if($("bossHealthValue"))$("bossHealthValue").textContent=Math.ceil(playerHealth)+" / "+playerHealthMax;
 }
@@ -95,9 +98,10 @@ function setHealth(value,max=playerHealthMax){
   if(playerHealth<=0&&!healthSuspended){healthResumeActive=active;healthSuspended=true;active=false;keys.clear();document.exitPointerLock?.();}
   else if(playerHealth>0&&healthSuspended){healthSuspended=false;active=healthResumeActive;}
   document.getElementById("healthInterrupted")?.remove();
-  if(healthSuspended){const notice=document.createElement("div");notice.id="healthInterrupted";notice.setAttribute("role","status");notice.textContent="生命信号中断 · 等待任务系统响应";document.body.append(notice);}
+  if(healthSuspended&&!relayEmbedded){const notice=document.createElement("div");notice.id="healthInterrupted";notice.setAttribute("role","status");notice.textContent="生命信号中断 · 等待任务系统响应";document.body.append(notice);}
  }
  healthListeners.forEach(listener=>listener({value:playerHealth,max:playerHealthMax}));
+ if(relayEmbedded&&playerHealth<=0&&relayReady&&!relayEnded)queueMicrotask(()=>submitRelay("fail","特工生命信号中断"));
 }
 function damagePlayer(amount,source="unknown"){
  const damage=Math.max(0,Number(amount)||0);if(!Number.isFinite(damage)||!damage||healthSuspended||won)return;setHealth(playerHealth-damage);
@@ -117,6 +121,72 @@ window.OneWriteHealth={
  heal(amount){setHealth(playerHealth+Math.max(0,Number(amount)||0));},
  onChange(listener){healthListeners.add(listener);return()=>healthListeners.delete(listener);}
 };
+
+const relayPanel=document.createElement('section');relayPanel.id='relayPanel';relayPanel.hidden=true;relayPanel.setAttribute('role','dialog');relayPanel.setAttribute('aria-modal','true');document.body.append(relayPanel);
+const relayExit=document.createElement('button');relayExit.id='relayExit';relayExit.textContent='终止任务';relayExit.hidden=true;document.body.append(relayExit);
+function showRelayPanel(title,message,actions=[]){
+ relayPanel.replaceChildren();const article=document.createElement('article'),heading=document.createElement('h2'),text=document.createElement('p');heading.textContent=title;text.textContent=message;article.append(heading,text);
+ for(const [label,handler] of actions){const button=document.createElement('button');button.textContent=label;button.onclick=handler;article.append(button);}relayPanel.append(article);relayPanel.hidden=false;article.querySelector('button')?.focus();
+}
+function syncStart(){
+ const button=$('start');if(!button)return;button.disabled=!ready||!relayReady||healthSuspended||relayEnded;
+ if(!relayReady)button.textContent=relayEmbedded?'正在接收大厅存档…':'正在准备独立试玩…';
+ else if(!ready)button.textContent='正在载入城市资源…';
+ else if(sessionStart===null&&briefingStep<0)button.textContent='接听指挥官通讯';
+}
+function showIncoming(save){
+ let info=$('relayInfo');if(!info){info=document.createElement('div');info.id='relayInfo';$('start').before(info);}info.replaceChildren();
+ const lines=save?[
+  ['接力状态', '生命 '+save.player.hp+' / '+save.player.max_hp+' · 理智 '+save.player.sanity+' · 历次阵亡 '+(save.player.deaths||0)],
+  ['前序通讯',save.exit_hook||'没有收到前序留言。'],
+  ['随身遗物',(save.items||[]).map(item=>item.name+'：'+item.desc).join('；')||'无。任务所需工具由人类阵营提供。'],
+  ['已知线索',(save.clues||[]).map(clue=>typeof clue==='string'?clue:JSON.stringify(clue)).join('；')||'无。'],
+  ['行动援助',relayAssist?'抵抗组织已降低巡检灵敏度。':'标准潜入协议。']
+ ]:[['独立试玩','本次为独立试玩，不读取或提交赛事旅程。']];
+ for(const [label,value] of lines){const p=document.createElement('p'),strong=document.createElement('strong');strong.textContent=label+' · ';p.append(strong,document.createTextNode(value));info.append(p);}
+}
+const relay=createRelay({embedded:relayEmbedded,sdk:()=>window.WL,getHealth:()=>({value:playerHealth,max:playerHealthMax}),applySave:save=>{
+ externalHealth=true;setHealth(save.player.hp,save.player.max_hp);
+ relayAssist=save.player.deaths>=3?2:save.player.deaths>=2?1:0;
+ const passive=(save.items||[]).filter(item=>item.effect?.trigger==='passive');
+ passiveAttack=passive.reduce((sum,item)=>sum+(item.effect.stat==='attack'?Number(item.effect.value)||0:0),0);
+ passiveSanity=passive.reduce((sum,item)=>sum+(item.effect.stat==='sanity'?Number(item.effect.value)||0:0),0);
+ showIncoming(save);
+},notify:(state,detail)=>{
+ if(state==='ready'){
+  relayReady=true;relayPaused=false;relayEnded=false;relayPanel.hidden=true;relayExit.hidden=!relayEmbedded;syncStart();
+  if(relayEmbedded&&playerHealth<=0)queueMicrotask(()=>submitRelay('fail','入场时生命已耗尽'));
+ }else if(state==='connection-error'){
+  showRelayPanel('接力通讯未建立',detail.message,[['重新连接',()=>{relayPanel.hidden=true;relay.connect().catch(()=>{});}]]);
+ }else if(state==='submitting'){
+  showRelayPanel('正在交接行动记录','正在等待大厅确认，请保持页面打开。');
+ }else if(state==='saved'){
+  showRelayPanel('行动记录已保存','大厅已确认保存，后续旅程由大厅接续。');
+ }else if(state==='preview'){
+  showRelayPanel('试玩交接校验通过','本次为模拟试玩，没有写入正式旅程。请在模拟器中继续或重新开始。');
+ }else if(state==='submission-error'){
+  const uncertain=/超时|未确认|重复|timeout/i.test(detail.message);
+  showRelayPanel('交接尚未确认',detail.message+'\n请先在大厅核对旅程进度。',uncertain?[]:[['重试交接',()=>submitRelay(lastRelayAction,lastRelayReason)]]);
+ }
+}});
+let lastRelayAction='fail',lastRelayReason='行动终止';
+function submitRelay(action,reason='行动终止'){
+ if(!relayEmbedded||!relayReady)return;
+ lastRelayAction=action;lastRelayReason=reason;relayEnded=true;relayPaused=true;active=false;keys.clear();relayExit.hidden=true;document.exitPointerLock?.();
+ return relay.submit(action,reason).catch(()=>{});
+}
+relayExit.onclick=()=>{
+ if(!relayReady||relayEnded||relayPaused)return;relayResumeActive=active;relayPaused=true;active=false;keys.clear();document.exitPointerLock?.();
+ showRelayPanel('终止本次任务？','这会向大厅报告任务失败，并交接当前生命与已有背包。',[
+  ['继续任务',()=>{relayPanel.hidden=true;relayPaused=false;active=relayResumeActive;}],
+  ['确认终止',()=>submitRelay('fail','特工主动终止潜入任务')]
+ ]);
+};
+addEventListener('iw-admin',event=>{
+ if(!event.detail?.save)return;
+ try{if(relay.receiveAdmin(event.detail.save))say('已同步大厅救援状态。',4);}catch(error){showRelayPanel('救援状态无法同步',error.message);}
+});
+
 function realmApplies(value,target){return !value||value==="common"||value===target;}
 function distance(x,z){return Math.hypot(camera.position.x-x,camera.position.z-z);}
 function updateMission(){
@@ -240,7 +310,7 @@ const eyeBoss=new EyeBoss({scene,camera,effect,onComplete:({command})=>{
 function beginDataSequence(kind){
  setCheckpoint();active=false;modalOpen=true;keys.clear();document.exitPointerLock?.();
  const entry={position:camera.position.clone(),quaternion:camera.quaternion.clone(),fov:camera.fov};
- if(kind==="boss"){eyeBoss.begin(entry);return;}
+ if(kind==="boss"){eyeBoss.attackPower=1+Math.min(3,passiveAttack);eyeBoss.begin(entry);return;}
  dataSpace.begin(kind==="archive"?"final":kind,entry);
 }
 function interactTarget(){
@@ -276,12 +346,14 @@ function updateExtraction(dt){
  if(t>=1){extraction.active=false;extraction.group.visible=false;extraction.ui.classList.remove("visible");document.body.classList.remove("data-cinematic");tone(920,.7,.04);finishMission();}
 }
 function finishMission(){
+ if(relayEnded)return;
  won=true;active=false;document.exitPointerLock?.();
- const total=Math.floor((performance.now()-sessionStart)/1000),elapsed=Math.floor(total/60)+":"+String(total%60).padStart(2,"0");
+ const total=Math.floor((performance.now()-(missionEnteredAt??sessionStart))/1000),elapsed=Math.floor(total/60)+":"+String(total%60).padStart(2,"0");
  $("overlay").innerHTML='<div class="card mission-debrief"><small>SECTOR 07 / EXTRACTION COMPLETE</small><h2></h2><p class="debrief-story"></p><div class="debrief-stats"><span>完成时间 <b class="time"></b></span><span>追踪回溯 <b class="captures"></b></span><span>剩余签名 <b>00</b></span></div><button id="again">重新潜入</button></div>';
  const card=$("overlay");card.querySelector("h2").textContent=archiveChoice==="erase"?"你成为了不存在的人。":"真相已回到人类手中。";
  card.querySelector(".debrief-story").textContent="《人类清除名单》已发送至人类阵营。你作为一道数据流撤离第七区，物理现实第一次出现了反攻的可能。";
  card.querySelector(".time").textContent=elapsed;card.querySelector(".captures").textContent=String(captures).padStart(2,"0");
+ if(relayEmbedded){$("again").remove();submitRelay("complete");return;}
  card.style.display="flex";$("again").onclick=()=>location.reload();tone(420,.8,.04);
 }
 
@@ -354,7 +426,8 @@ function animateIntro(now){
 }
 $("introOrbit")?.addEventListener("pointermove",event=>{introTilt=(event.clientX/innerWidth-.5)*1.4;});
 function start(){
- if(!ready||healthSuspended)return;
+ if(!ready||!relayReady||healthSuspended||relayPaused||relayEnded)return;
+ if(missionEnteredAt===null)missionEnteredAt=performance.now();
  if(sessionStart===null&&briefingStep<2){
   initAudio();audio?.resume();musicTrack?.play().catch(()=>{});
   briefingStep++;
@@ -381,8 +454,8 @@ function start(){
  say(route[stage].task,6);
 }
 $("start").onclick=start;
-$("pause").onclick=()=>{if(won)return;active=false;keys.clear();document.exitPointerLock?.();$("overlay").style.display="flex";$("start").textContent="继续潜入";};
-renderer.domElement.onclick=()=>{if(active&&!matchMedia("(pointer:coarse)").matches)renderer.domElement.requestPointerLock?.();};
+$("pause").onclick=()=>{if(won||relayPaused||relayEnded)return;active=false;keys.clear();document.exitPointerLock?.();$("overlay").style.display="flex";$("start").textContent="继续潜入";};
+renderer.domElement.onclick=()=>{if(active&&!matchMedia("(pointer:coarse)").matches)renderer.domElement.requestPointerLock?.()?.catch?.(()=>say("使用方向键也能转向。",4));};
 
 function backstabTarget(){
  if(!active||modalOpen||melee.active||realm!=="echo")return null;
@@ -462,7 +535,7 @@ function throwDecoy(){
 }
 function toggleCrouch(){if(!active||modalOpen)return;crouched=!crouched;tone(crouched?180:240,.12,.015);}
 addEventListener("keydown",event=>{
- if(healthSuspended)return;
+ if(healthSuspended||relayPaused||relayEnded)return;
  if(eyeBoss.handleKey(event.code)){event.preventDefault();return;}
  if(modalOpen||event.target instanceof HTMLTextAreaElement||event.target instanceof HTMLInputElement)return;
  if(["KeyW","KeyS","KeyA","KeyD","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Space"].includes(event.code))event.preventDefault();
@@ -470,7 +543,7 @@ addEventListener("keydown",event=>{
  if(event.code==="KeyT")editWorld();if(event.code==="KeyQ")switchRealm();if(event.code==="KeyF")throwDecoy();if(event.code==="KeyC")toggleCrouch();if(event.code==="KeyV")tryBackstab();
 });
 addEventListener("keyup",event=>{eyeBoss.handleKeyUp(event.code);keys.delete(event.code);});
-addEventListener("blur",()=>{keys.clear();eyeBoss.left=false;eyeBoss.right=false;active=false;if(!won&&!modalOpen){$("overlay").style.display="flex";$("start").textContent=ready?"继续潜入":"正在载入 Blender 场景…";}});
+addEventListener("blur",()=>{keys.clear();eyeBoss.left=false;eyeBoss.right=false;active=false;if(!won&&!modalOpen&&!relayEnded&&!relayPaused){$("overlay").style.display="flex";$("start").textContent=ready?"继续潜入":"正在载入 Blender 场景…";}});
 addEventListener("mousemove",event=>{
  if(active&&document.pointerLockElement===renderer.domElement){
   camera.rotation.y-=event.movementX*.00205;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-event.movementY*.00205,-1.22,1.22);
@@ -698,7 +771,7 @@ new GLTFLoader().load("level.glb",gltf=>{
   mesh.castShadow=!batch.material.transparent;mesh.receiveShadow=true;scene.add(mesh);realmObjects.push(mesh);if(batch.layer!=="echo")physicalObjects.push(mesh);batch.objects.forEach(object=>object.removeFromParent());
  }
  createEchoProxies();droneStates.forEach(syncEchoProxy);
- ready=true;$("start").disabled=false;$("start").textContent="接听指挥官通讯";updateLighting();
+ ready=true;syncStart();updateLighting();
 },undefined,error=>{$("start").textContent="场景加载失败，请用「开始3D游戏.cmd」启动";$("message").textContent=String(error);console.error(error);});
 
 let handModel=null,daggerModel=null;
@@ -812,7 +885,7 @@ function updateStealth(dt){
  inShadow=shadowAt(camera.position.x,camera.position.z);nearCover=coverNearby();
  let seen=false,heard=false,investigating=false,groundContact=false;
  droneStates.forEach(state=>{updateDrone(state,dt);seen ||= state.seen;heard ||= state.heard;groundContact ||= state.kind==="ground"&&(state.seen||state.heard);investigating ||= ["investigate","suspicious","chase"].includes(state.mode);});
- const captureAssist=Math.max(.68,1-captures*.08);
+ const captureAssist=Math.max(.45,1-captures*.08-relayAssist*.12-Math.min(3,passiveSanity)*.06);
  if(seen)exposure+=dt*.43*(inShadow?.55:1)*(crouched?.68:1)*(archiveChoice==="copy"?1.28:1)*captureAssist;
  else if(heard)exposure+=dt*.07;
  else exposure-=dt*(investigating?.1:.26);
@@ -831,9 +904,9 @@ function updateStealth(dt){
 
 let mapTimer=0,deviceTimer=0;
 function tick(){
- requestAnimationFrame(tick);const realDt=Math.min(clock.getDelta(),.05),dt=hitStop>0||healthSuspended||document.hidden?0:realDt;hitStop=Math.max(0,hitStop-realDt);time+=dt;
- if(!healthSuspended){dataSpace.update(dt);eyeBoss.update(dt);updateExtraction(dt);}
- if(active&&!won&&!melee.active){
+ requestAnimationFrame(tick);const realDt=Math.min(clock.getDelta(),.05),dt=hitStop>0||healthSuspended||relayPaused||document.hidden?0:realDt;hitStop=Math.max(0,hitStop-realDt);time+=dt;
+ if(!healthSuspended&&!relayPaused){dataSpace.update(dt);eyeBoss.update(dt);updateExtraction(dt);}
+ if(active&&!won&&!relayPaused&&!melee.active){
   if(keys.has("ArrowLeft"))camera.rotation.y+=dt*1.5;if(keys.has("ArrowRight"))camera.rotation.y-=dt*1.5;
   if(keys.has("ArrowUp"))camera.rotation.x=Math.min(1.2,camera.rotation.x+dt);if(keys.has("ArrowDown"))camera.rotation.x=Math.max(-1.2,camera.rotation.x-dt);
   let forward=(keys.has("KeyW")?1:0)-(keys.has("KeyS")?1:0),strafe=(keys.has("KeyD")?1:0)-(keys.has("KeyA")?1:0);
@@ -881,7 +954,7 @@ function tick(){
   digitalFloaters.forEach(({object,speed,baseY,phase})=>{object.rotation.y+=dt*speed;object.position.y=baseY+Math.sin(time*.7+phase)*.22;});
   if(digitalScan)digitalScan.position.z=((time*3.2)%38)-22;
  }
- updateMelee(realDt);updateImpact(dt);updateViewModel(realDt);cameraShake=Math.max(0,cameraShake-realDt*.16);camera.rotation.z=cameraShake>0?(Math.random()-.5)*cameraShake:0;
+ updateMelee(relayPaused?0:realDt);updateImpact(dt);updateViewModel(realDt);cameraShake=Math.max(0,cameraShake-realDt*.16);camera.rotation.z=cameraShake>0?(Math.random()-.5)*cameraShake:0;
  mapTimer+=dt;if(mapTimer>.07){drawMap();mapTimer=0;}deviceTimer+=dt;if(deviceTimer>.15){drawDevice();deviceTimer=0;}
  effect.render(scene,camera,dt);
 }
@@ -898,3 +971,6 @@ function editWorld(){
 }
 $("editWorld").onclick=editWorld;
 updateMission();updateHealthUI();drawDevice();requestAnimationFrame(animateIntro);tick();
+
+if(!relayEmbedded)showIncoming(null);
+relay.connect().catch(()=>{});

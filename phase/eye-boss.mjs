@@ -58,7 +58,7 @@ export class EyeBoss{
   this.lanceTime=0;this.lanceStart=this.camera.position.clone();this.lance.visible=true;this.onTone(780,.16,.045,"square");this.ui.querySelector("#bossLog").textContent="相位处决器已发射。";
  }
  hitEye(){
-  this.health--;this.hits++;this.burstLife=.65;const positions=this.burst.geometry.attributes.position.array;
+  this.health=Math.max(0,this.health-(this.attackPower||1));this.hits++;this.burstLife=.65;const positions=this.burst.geometry.attributes.position.array;
   for(let i=0;i<positions.length;i+=3){const a=Math.random()*Math.PI*2,r=Math.random()*2;positions.set([Math.cos(a)*r,(Math.random()-.5)*3,2.4+Math.sin(a)*r],i);}
   this.burst.geometry.attributes.position.needsUpdate=true;this.burst.material.opacity=1;this.onTone(90,.25,.075,"sawtooth");this.effect.alarm=.35;
   this.ui.querySelectorAll(".bossSegments i").forEach((segment,index)=>segment.classList.toggle("lost",index>=this.health));
