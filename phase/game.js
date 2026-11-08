@@ -86,6 +86,21 @@ function showOcularCutin(next){
 }
 const relayEmbedded=window.parent!==window;
 let relayPaused=false,relayEnded=false,relayResumeActive=false,relayReady=false,relayAssist=0,passiveAttack=0,passiveSanity=0,missionEnteredAt=null;
+let missionEndedAt = null;
+const playElapsed = $("playElapsed");
+
+function updatePlayTimer(now = performance.now()) {
+ const seconds = missionEnteredAt === null ? 0 :
+  Math.floor(((missionEndedAt ?? now) - missionEnteredAt) / 1000);
+ const elapsed = String(Math.floor(seconds / 60)).padStart(2, "0") + ":" +
+  String(seconds % 60).padStart(2, "0");
+ if (playElapsed.textContent !== elapsed) {
+  playElapsed.textContent = elapsed;
+  playElapsed.dateTime = "PT" + seconds + "S";
+ }
+ return elapsed;
+}
+
 let playerHealth=relayEmbedded?0:100,playerHealthMax=relayEmbedded?1:100,externalHealth=relayEmbedded,healthSuspended=false,healthResumeActive=false;const healthListeners=new Set();
 function updateHealthUI(){
  if(!$("healthBar"))return;$("healthBar").style.width=(playerHealth/playerHealthMax*100)+"%";$("healthValue").textContent=Math.ceil(playerHealth)+" / "+playerHealthMax;if($("bossHealthValue"))$("bossHealthValue").textContent=Math.ceil(playerHealth)+" / "+playerHealthMax;
@@ -173,6 +188,8 @@ let lastRelayAction='fail',lastRelayReason='行动终止';
 function submitRelay(action,reason='行动终止'){
  if(!relayEmbedded||!relayReady)return;
  if(relay.state==="submitting"||relay.state==="saved"||relay.state==="preview")return;
+ missionEndedAt ??= performance.now();
+ updatePlayTimer();
  lastRelayAction=action;lastRelayReason=reason;relayEnded=true;relayPaused=true;active=false;keys.clear();relayExit.hidden=true;document.exitPointerLock?.();
  return relay.submit(action,reason).catch(()=>{});
 }
@@ -349,7 +366,8 @@ function updateExtraction(dt){
 function finishMission(){
  if(relayEnded)return;
  won=true;active=false;document.exitPointerLock?.();
- const total=Math.floor((performance.now()-(missionEnteredAt??sessionStart))/1000),elapsed=Math.floor(total/60)+":"+String(total%60).padStart(2,"0");
+ missionEndedAt ??= performance.now();
+ const elapsed = updatePlayTimer();
  $("overlay").innerHTML='<div class="card mission-debrief"><small>SECTOR 07 / EXTRACTION COMPLETE</small><h2></h2><p class="debrief-story"></p><div class="debrief-stats"><span>完成时间 <b class="time"></b></span><span>追踪回溯 <b class="captures"></b></span><span>剩余签名 <b>00</b></span></div><button id="again">重新潜入</button></div>';
  const card=$("overlay");card.querySelector("h2").textContent=archiveChoice==="erase"?"你成为了不存在的人。":"真相已回到人类手中。";
  card.querySelector(".debrief-story").textContent="《人类清除名单》已发送至人类阵营。你作为一道数据流撤离第七区，物理现实第一次出现了反攻的可能。";
@@ -957,6 +975,7 @@ function updateStealth(dt){
 
 let mapTimer=0,deviceTimer=0;
 function tick(){
+ if (missionEnteredAt !== null && missionEndedAt === null) updatePlayTimer();
  requestAnimationFrame(tick);const realDt=Math.min(clock.getDelta(),.05),dt=hitStop>0||healthSuspended||relayPaused||document.hidden?0:realDt;hitStop=Math.max(0,hitStop-realDt);time+=dt;
  if(!healthSuspended&&!relayPaused){dataSpace.update(dt);eyeBoss.update(dt);updateExtraction(dt);}
  if(active&&!won&&!relayPaused&&!melee.active){
