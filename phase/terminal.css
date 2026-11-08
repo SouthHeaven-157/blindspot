@@ -36,3 +36,16 @@
 @keyframes briefingText{from{opacity:0;transform:translateY(15px);filter:blur(6px)}to{opacity:1;transform:translateY(0);filter:blur(0)}}
 @media(max-width:750px){#overlay .introCard{padding:20px}#overlay .introOrbitWrap{position:relative;top:auto;width:100%;height:220px}#overlay .introBoss{display:none}#overlay #introDialogue{font-size:14px;min-height:0}}
 @media(prefers-reduced-motion:reduce){#introOrbit,.briefing-reveal #introDialogue,.briefing-reveal h2{animation:none;transition:none}}
+
+/* Mission briefing hierarchy and orbital motion. */
+#overlay .introCard{width:min(1320px,96vw);min-height:620px;padding:48px 44px 36px 48%;background:radial-gradient(ellipse at 21% 44%,#123b4e88,transparent 46%),linear-gradient(120deg,#020814f5,#090e20fa)}
+#overlay .introCard h2{font-size:clamp(32px,4vw,62px);font-weight:700;line-height:1.16;letter-spacing:1px;margin:18px 0 22px}
+#overlay #introDialogue{font-size:18px;line-height:1.95;color:#edf9f6;min-height:155px}
+.storyEyebrow{color:#ffb98b;font-size:12px;letter-spacing:2px;margin-top:24px;border-left:3px solid #ff8e66;padding-left:10px}
+#briefingProgress{font:11px Consolas,monospace;letter-spacing:2px;color:#83bfae;margin-bottom:18px}
+#overlay .introOrbitWrap{top:7%;height:83%}
+#overlay .introBoss{bottom:12px;border:1px solid #386271;border-left:3px solid #7bffe1;background:#071521eb;box-shadow:0 12px 40px #0008}
+#overlay .introBoss small{color:#79f9dc}
+#overlay .introCard #start{width:100%;font-size:16px;letter-spacing:2px;padding:17px;background:#a3f9dc;box-shadow:0 0 28px #63e4c222}
+#introOrbit{animation-fill-mode:backwards}
+@media(max-width:750px){#overlay .introCard{min-height:0;padding:22px}#overlay .introOrbitWrap{height:220px;top:auto}#overlay .introCard h2{font-size:32px}#overlay #introDialogue{font-size:15px;min-height:0}.storyEyebrow{font-size:10px}#overlay .introBoss{display:block;position:relative;bottom:auto;left:auto;right:auto;padding:8px}#overlay .introBoss b{font-size:12px}#overlay .introOrbitWrap{height:auto}#introOrbit{height:170px}}

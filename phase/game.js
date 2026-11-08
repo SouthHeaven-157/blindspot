@@ -333,6 +333,24 @@ function animateIntro(now){
  ctx.save();ctx.translate(cx,cy);ctx.rotate(angle*.35);ctx.strokeStyle="#9cf9f044";for(let i=-3;i<=3;i++){ctx.beginPath();ctx.ellipse(0,i*19,Math.sqrt(1-i*i/16)*82,13,0,0,Math.PI*2);ctx.stroke();}for(let i=0;i<6;i++){ctx.beginPath();ctx.ellipse(0,0,18+i*11,82,i*.42,0,Math.PI*2);ctx.stroke();}ctx.restore();
  ctx.strokeStyle="#b9fff088";ctx.beginPath();ctx.arc(cx,cy,91+Math.sin(t*2)*2,0,Math.PI*2);ctx.stroke();ctx.fillStyle="#9deee4";ctx.font="11px Consolas,monospace";ctx.fillText("HUMAN UPLINK / 07",18,24);ctx.fillStyle="#8771b9";ctx.fillText("ORBITAL HANDSHAKE",w-174,24);
 
+ // A moving separation plane and outbound packets make the split visible.
+ ctx.save();
+ const split=cx+Math.sin(t*.65)*10;
+ ctx.strokeStyle="#c2fff0";ctx.shadowBlur=18;ctx.shadowColor="#7cffe1";
+ ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(split,cy-112);ctx.lineTo(split,cy+112);ctx.stroke();
+ ctx.shadowBlur=0;ctx.font="bold 13px Consolas,monospace";
+ ctx.fillStyle="#ffba7c";ctx.fillText("PHYSICAL / CONTROLLED",24,h-52);
+ ctx.fillStyle="#94a5ff";ctx.fillText("VIRTUAL / INFILTRATE",w-213,h-52);
+ for(let i=0;i<38;i++){
+  const progress=(t*.21+i/38)%1;
+  const x=cx+(progress-.5)*w;
+  const y=cy+Math.sin(i*2.4)*Math.sin(progress*Math.PI)*145;
+  ctx.fillStyle=i%2?"#89ffe3":"#b48bff";
+  ctx.globalAlpha=Math.sin(progress*Math.PI)*.8;
+  ctx.fillRect(x,y,briefingStep===2?20:3,2);
+ }
+ ctx.restore();
+
 }
 $("introOrbit")?.addEventListener("pointermove",event=>{introTilt=(event.clientX/innerWidth-.5)*1.4;});
 function start(){
@@ -348,6 +366,7 @@ function start(){
   const scene=scenes[briefingStep],card=$("overlay").querySelector(".introCard");
   card.dataset.briefing=briefingStep;
   card.querySelector("small").textContent=scene[0];
+  $("briefingProgress").textContent=(briefingStep+1)+" / 3 · 指挥官任务简报";
   card.querySelector("h2").textContent=scene[1];
   $("introDialogue").textContent=scene[2];
   card.querySelector(".introBoss b").textContent=scene[3];
@@ -552,7 +571,11 @@ const patrolRoutes=[
  [[4.7,7],[4.7,.5],[-4.2,.5],[-4.2,7]],
  [[4.5,-8],[4.5,-17],[-4.3,-17],[-4.3,-8]]
 ];
-const scoutRoutes=[[[-4.8,7.2],[-4.8,4.4],[-2.15,4.4],[-2.15,7.2]]];
+const scoutRoutes=[
+ [[-4.8,7.2],[-4.8,4.4],[-2.15,4.4],[-2.15,7.2]],
+ [[-1.8,-6.5],[1.8,-6.5],[1.8,-8.5],[-1.8,-8.5]],
+ [[-1.8,-13],[1.8,-13],[1.8,-16],[-1.8,-16]]
+];
 function addPatrolState(object,route,kind,index){
  const ground=kind==="ground";
  const state={object,route,kind,index,waypoint:1,mode:"patrol",suspicion:0,searchTimer:0,lastSeen:new THREE.Vector3(),vision:createVisionSector(ground?6.1:7.2,ground?92:78),seen:false,heard:false,wheels:[],disabled:false,destroyedTime:0};
@@ -560,7 +583,20 @@ function addPatrolState(object,route,kind,index){
  object.position.set(route[0][0],ground?.025:3.15,route[0][1]);object.rotation.y=Math.atan2(route[1][0]-route[0][0],route[1][1]-route[0][1]);droneStates.push(state);
 }
 function setupDrones(){
- drones.forEach((object,i)=>addPatrolState(object,patrolRoutes[i],"air",i));
+ // Reuse the finished scout asset for three distinct street patrols.
+ drones.slice(1).forEach(object=>object.removeFromParent());
+ drones.splice(1);
+ const template=scouts[0];
+ if(template){
+  while(scouts.length<scoutRoutes.length){
+   const clone=template.clone(true);
+   clone.name="RX-01 Patrol "+(scouts.length+1);
+   template.parent.add(clone);
+   clone.traverse(object=>{if(object.userData.wheel)wheelStates.push(object);});
+   scouts.push(clone);
+  }
+ }
+ drones.forEach((object,i)=>addPatrolState(object,patrolRoutes[1],"air",i));
  scouts.forEach((object,i)=>addPatrolState(object,scoutRoutes[i],"ground",i));
 }
 function batchRigid(root,skipWheels=false,view=false){
@@ -733,7 +769,7 @@ function moveDrone(state,target,speed,dt){
 function updateDrone(state,dt){
  if(state.disabled){updateDestroyed(state,dt);return;}
  const object=state.object,ground=state.kind==="ground";state.seen=false;state.heard=false;
- const enabled=deviceState["patrol.enabled"],dx=camera.position.x-object.position.x,dz=camera.position.z-object.position.z,dist=Math.hypot(dx,dz);
+ const enabled=deviceState["patrol.enabled"]&&(sessionStart===null||performance.now()-sessionStart>=5000),dx=camera.position.x-object.position.x,dz=camera.position.z-object.position.z,dist=Math.hypot(dx,dz);
  if(enabled&&realm==="real"){
   const fx=Math.sin(object.rotation.y),fz=Math.cos(object.rotation.y),dot=(dx*fx+dz*fz)/(dist||1);
   const stanceRange=crouched?(ground?4.2:5.8):(ground?6.3:7.2),identityRange=archiveChoice==="erase"?.68:1;
