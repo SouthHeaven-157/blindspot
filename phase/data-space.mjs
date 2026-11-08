@@ -142,8 +142,8 @@ export class DataSpace{
   button.onclick=()=>this.beginAction(value);this.ui.querySelector(".dataActions").append(button);
  }
  mountDecryption(actions){
-  this.ui.querySelector("#dataDescription").textContent=this.kind==="intercept"?"恢复链路，解出加密信道，再向物理端口写入授权。":"验证动态挑战，构造能通过 M-09 的执行签名。";
-  this.ui.querySelector(".terminalReadout>b").textContent=this.kind==="intercept"?"PACKET ROUTING / CIPHER":"XOR / ROTATE / SIGN";
+  this.ui.querySelector("#dataDescription").textContent=this.kind==="intercept"?"旋转管道，接通能源入口与授权出口。":"根据维修记录拨动数字锁，恢复 M-09 的执行权限。";
+  this.ui.querySelector(".terminalReadout>b").textContent=this.kind==="intercept"?"PIPE ROUTING / POWER FLOW":"COMBINATION LOCK / FOUR DIGITS";
   mountDecrypt(actions,this.kind,()=>this.phase==="inspect",command=>{
    this.command=command;this.beginAction("decoded");
   });

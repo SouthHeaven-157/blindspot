@@ -49,3 +49,30 @@
 #overlay .introCard #start{width:100%;font-size:16px;letter-spacing:2px;padding:17px;background:#a3f9dc;box-shadow:0 0 28px #63e4c222}
 #introOrbit{animation-fill-mode:backwards}
 @media(max-width:750px){#overlay .introCard{min-height:0;padding:22px}#overlay .introOrbitWrap{height:220px;top:auto}#overlay .introCard h2{font-size:32px}#overlay #introDialogue{font-size:15px;min-height:0}.storyEyebrow{font-size:10px}#overlay .introBoss{display:block;position:relative;bottom:auto;left:auto;right:auto;padding:8px}#overlay .introBoss b{font-size:12px}#overlay .introOrbitWrap{height:auto}#introOrbit{height:170px}}
+
+.pipe-schematic{position:relative;padding:0 30px;margin:20px 0}
+.pipe-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.decrypt-console .pipe-grid button{aspect-ratio:1;width:100%;margin:0;padding:0!important;display:grid;place-items:center;background:#0a1824;border:1px solid #325365;border-radius:6px;overflow:hidden}
+.pipe-cell svg{width:100%;height:100%;overflow:visible}
+.pipe-wall{fill:none;stroke:#355261;stroke-width:16;stroke-linecap:butt}
+.pipe-flow{fill:none;stroke:#09131c;stroke-width:7}
+.pipe-cell circle{fill:#667f88}
+.pipe-cell.powered{box-shadow:inset 0 0 14px #3bffe52a}
+.pipe-cell.powered .pipe-wall{stroke:#467b82}
+.pipe-cell.powered .pipe-flow{stroke:#8bffe4;stroke-dasharray:8 4;animation:pipeStream 1s linear infinite}
+.pipe-cell.powered circle{fill:#d7fff5}
+.decrypt-console .pipe-grid button.empty{background:#050d17;border-color:#152531;opacity:.5}
+.pipe-port{position:absolute;top:37.5%;transform:translateY(-50%);font:10px Consolas,monospace;color:#708e9b}
+.pipe-port.inlet{left:0;color:#8bffe4}.pipe-port.outlet{right:0}.pipe-port.connected{color:#8bffe4;text-shadow:0 0 10px #4fffff}
+.decrypt-console .puzzle-reset{background:transparent;color:#9fb4bf}
+.lock-clues{padding:14px 14px 14px 32px;background:#05131d;border-left:2px solid #d3aa6e;color:#d9e5e6;font-size:13px;line-height:1.9}
+.lock-wheels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:18px 0}
+.lock-wheel{text-align:center;border:1px solid #3d5563;border-radius:8px;background:linear-gradient(#172a36,#050b15 50%,#152735);padding:7px 3px;box-shadow:inset 0 0 14px #0008}
+.lock-wheel small{font:10px Consolas,monospace;color:#748e9c}
+.decrypt-console .lock-wheel button{text-align:center;margin:3px 0;padding:6px!important;border:0;background:transparent;color:#9ae6d6;min-height:32px}
+.lock-wheel output{display:block;padding:10px 0;border-block:1px solid #41626b;font:34px/1 Consolas,monospace;color:#d6fff2;text-shadow:0 0 16px #64d8ba55}
+.dial-turn{animation:dialTurn .15s ease-out}
+.decrypt-console button:focus-visible{outline:2px solid #ffe1a3;outline-offset:2px}
+@keyframes pipeStream{to{stroke-dashoffset:-24}}
+@keyframes dialTurn{from{transform:translateY(-5px);opacity:.4}to{transform:translateY(0);opacity:1}}
+@media(prefers-reduced-motion:reduce){.pipe-cell.powered .pipe-flow,.dial-turn{animation:none}}
