@@ -1,5 +1,5 @@
 // Platform state is separate from standalone practice. No persistence or synthetic relay saves.
-export function createRelay({embedded,sdk,getHealth,applySave,notify=()=>{}}){
+export function createRelay({embedded,sdk,readIncoming=()=>sdk().ready(),getHealth,applySave,notify=()=>{}}){
  let state='idle',save=null,pending=null,connecting=null,receipt=null;
  const emit=(next,detail)=>{state=next;notify(next,detail);};
  const accept=incoming=>{
@@ -15,7 +15,7 @@ export function createRelay({embedded,sdk,getHealth,applySave,notify=()=>{}}){
    connecting=(async()=>{
     if(!embedded){emit('ready');return null;}
     const bridge=sdk();if(!bridge?.ready)throw Error('官方接力 SDK 加载失败，请重新加载；未启用默认生命。');
-    accept(await bridge.ready());emit('ready');return save;
+    accept(await readIncoming());emit('ready');return save;
    })().catch(error=>{emit('connection-error',error);throw error;}).finally(()=>{connecting=null;});
    return connecting;
   },
@@ -31,7 +31,7 @@ export function createRelay({embedded,sdk,getHealth,applySave,notify=()=>{}}){
    const health=getHealth();
    if(!Number.isFinite(health.value)||!Number.isFinite(health.max)||health.max<=0||health.value<0||health.value>health.max)return Promise.reject(Error('生命状态无效，未提交。'));
    const outgoing=structuredClone(save);
-   outgoing.player.hp=health.value;outgoing.player.max_hp=health.max;
+   outgoing.player.hp=Math.min(health.value,outgoing.player.max_hp);
    emit('submitting',{action});
    pending=Promise.resolve().then(()=>action==='complete'?sdk().complete(outgoing,{acquiredItemIds:[]}):sdk().fail(reason,outgoing,{acquiredItemIds:[]})).then(result=>{
     if(result?.persisted!==true&&result?.preview!==true)throw Error('未确认保存，请返回大厅核对进度，不要重复提交。');

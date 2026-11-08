@@ -145,7 +145,7 @@ function showIncoming(save){
  ]:[['独立试玩','本次为独立试玩，不读取或提交赛事旅程。']];
  for(const [label,value] of lines){const p=document.createElement('p'),strong=document.createElement('strong');strong.textContent=label+' · ';p.append(strong,document.createTextNode(value));info.append(p);}
 }
-const relay=createRelay({embedded:relayEmbedded,sdk:()=>window.WL,getHealth:()=>({value:playerHealth,max:playerHealthMax}),applySave:save=>{
+const relay=createRelay({embedded:relayEmbedded,sdk:()=>window.WL,readIncoming:()=>window.OneWriteEntry.ready(),getHealth:()=>({value:playerHealth,max:playerHealthMax}),applySave:save=>{
  externalHealth=true;setHealth(save.player.hp,save.player.max_hp);
  relayAssist=save.player.deaths>=3?2:save.player.deaths>=2?1:0;
  const passive=(save.items||[]).filter(item=>item.effect?.trigger==='passive');
@@ -172,6 +172,7 @@ const relay=createRelay({embedded:relayEmbedded,sdk:()=>window.WL,getHealth:()=>
 let lastRelayAction='fail',lastRelayReason='行动终止';
 function submitRelay(action,reason='行动终止'){
  if(!relayEmbedded||!relayReady)return;
+ if(relay.state==="submitting"||relay.state==="saved"||relay.state==="preview")return;
  lastRelayAction=action;lastRelayReason=reason;relayEnded=true;relayPaused=true;active=false;keys.clear();relayExit.hidden=true;document.exitPointerLock?.();
  return relay.submit(action,reason).catch(()=>{});
 }
