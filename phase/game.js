@@ -451,12 +451,46 @@ function start(){
  }
  introActive=false;if(sessionStart===null)sessionStart=performance.now();active=true;$("overlay").style.display="none";
  initAudio();audio?.resume();if(musicTrack?.paused)musicTrack.play().catch(()=>{});updateAudioMix();sweep(180,740,.75);
- if(!matchMedia("(pointer:coarse)").matches)renderer.domElement.requestPointerLock?.()?.catch?.(()=>say("使用方向键也能转向。",4));
+ requestMouseLook();
  say(route[stage].task,6);
 }
 $("start").onclick=start;
 $("pause").onclick=()=>{if(won||relayPaused||relayEnded)return;active=false;keys.clear();document.exitPointerLock?.();$("overlay").style.display="flex";$("start").textContent="继续潜入";};
-renderer.domElement.onclick=()=>{if(active&&!matchMedia("(pointer:coarse)").matches)renderer.domElement.requestPointerLock?.()?.catch?.(()=>say("使用方向键也能转向。",4));};
+let pointerLockDenied = false;
+let dragLook = null;
+let draggedView = false;
+const canvas = renderer.domElement;
+
+function rotateView(dx, dy, sensitivity) {
+ camera.rotation.y -= dx * sensitivity;
+ camera.rotation.x = clamp(camera.rotation.x - dy * sensitivity, -1.22, 1.22);
+}
+
+function useDragLook() {
+ if (pointerLockDenied) return;
+ pointerLockDenied = true;
+ say("按住鼠标左键拖动视角，也可使用方向键。", 5);
+}
+
+function requestMouseLook() {
+ if (!active || modalOpen || pointerLockDenied || document.pointerLockElement === canvas ||
+     matchMedia("(pointer:coarse)").matches) return;
+ if (!canvas.requestPointerLock) {
+  useDragLook();
+  return;
+ }
+ try {
+  canvas.requestPointerLock()?.catch(useDragLook);
+ } catch {
+  useDragLook();
+ }
+}
+
+canvas.addEventListener("click", event => {
+ if (event.pointerType !== "touch" && !draggedView) requestMouseLook();
+ draggedView = false;
+});
+canvas.style.touchAction = "none";
 
 function backstabTarget(){
  if(!active||modalOpen||melee.active||realm!=="echo")return null;
@@ -545,12 +579,13 @@ addEventListener("keydown",event=>{
 });
 addEventListener("keyup",event=>{eyeBoss.handleKeyUp(event.code);keys.delete(event.code);});
 addEventListener("blur",()=>{keys.clear();eyeBoss.left=false;eyeBoss.right=false;active=false;if(!won&&!modalOpen&&!relayEnded&&!relayPaused){$("overlay").style.display="flex";$("start").textContent=ready?"继续潜入":"正在载入 Blender 场景…";}});
-addEventListener("mousemove",event=>{
- if(active&&document.pointerLockElement===renderer.domElement){
-  camera.rotation.y-=event.movementX*.00205;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-event.movementY*.00205,-1.22,1.22);
+addEventListener("mousemove", event => {
+ if (active && !modalOpen && document.pointerLockElement === canvas) {
+  rotateView(event.movementX, event.movementY, .00205);
  }
 });
-document.addEventListener("pointerlockerror",()=>say("鼠标捕获不可用。可以使用方向键调整视角。",5));
+document.addEventListener("pointerlockerror", useDragLook);
+document.addEventListener("pointerlockchange", () => { dragLook = null; });
 document.querySelectorAll("[data-move]").forEach(button=>{
  button.onpointerdown=event=>{event.preventDefault();button.setPointerCapture(event.pointerId);keys.add(button.dataset.move);};
  button.onpointerup=button.onpointercancel=()=>keys.delete(button.dataset.move);
@@ -558,12 +593,30 @@ document.querySelectorAll("[data-move]").forEach(button=>{
 $("touchQ").onclick=switchRealm;$("touchF").onclick=throwDecoy;$("touchC").onclick=toggleCrouch;$("touchV").onclick=tryBackstab;
 $("touchE").onpointerdown=event=>{event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);keys.add("KeyE");};
 $("touchE").onpointerup=$("touchE").onpointercancel=()=>keys.delete("KeyE");
-let touchPoint=null;
-renderer.domElement.addEventListener("pointerdown",event=>{if(event.pointerType==="touch")touchPoint=[event.clientX,event.clientY];});
-renderer.domElement.addEventListener("pointermove",event=>{
- if(touchPoint&&active){camera.rotation.y-=(event.clientX-touchPoint[0])*.005;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-(event.clientY-touchPoint[1])*.005,-1.22,1.22);touchPoint=[event.clientX,event.clientY];}
+canvas.addEventListener("pointerdown", event => {
+ if (!active || modalOpen || !event.isPrimary || event.button !== 0 ||
+     document.pointerLockElement === canvas) return;
+ draggedView = false;
+ dragLook = { id: event.pointerId, x: event.clientX, y: event.clientY };
+ canvas.setPointerCapture(event.pointerId);
 });
-renderer.domElement.addEventListener("pointerup",()=>touchPoint=null);
+canvas.addEventListener("pointermove", event => {
+ if (!active || modalOpen || dragLook?.id !== event.pointerId ||
+     document.pointerLockElement === canvas) return;
+ const dx = event.clientX - dragLook.x;
+ const dy = event.clientY - dragLook.y;
+ if (!dx && !dy) return;
+ draggedView = true;
+ rotateView(dx, dy, event.pointerType === "touch" ? .005 : .0035);
+ dragLook.x = event.clientX;
+ dragLook.y = event.clientY;
+});
+for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+ canvas.addEventListener(type, event => {
+  if (dragLook?.id === event.pointerId) dragLook = null;
+ });
+}
+addEventListener("blur", () => { dragLook = null; });
 
 // Rain is geometry, not a screen overlay: streaks parallax with the camera.
 const rainCount=780,rainPositions=new Float32Array(rainCount*6),rainSeeds=[];
