@@ -435,7 +435,7 @@ function start(){
   const scenes=[
    ["01 / 被统治的世界","现实，已被接管。","超级人工智能 CIVIC MEMORY 接管了城市。它将世界分裂为物理现实与虚拟数据两个位面。人类的每一次呼吸，都在它的监控之下。","指挥官 / 林：A-017，通讯已加密。你是我们在第七区最后的特工。"],
    ["02 / 指挥官的委托","把清除名单带回来。","AI 即将执行人类清除计划。先破解两座巡检终端，取得主控命令。在数据层击败电子眼，才能接近存有《人类清除名单》的最终终端。","指挥官 / 林：我们需要名单，也需要能证明这一切的原始签名。"],
-   ["03 / 相位行动协议","你的身体，也能成为数据。","Q 切入数据位面，扫描侦察兵投影，从背后按 V 处决。窃取文档后，保持义眼连接。我会将你解构为数据流，传送回人类阵营。","指挥官 / 林：记住，带着真相回来。现在开始行动。"]
+   ["03 / 相位行动协议","你的身体，也能成为数据。","Q 切入数据位面，扫描侦察兵投影，靠近后按 V 处决。窃取文档后，保持义眼连接。我会将你解构为数据流，传送回人类阵营。","指挥官 / 林：记住，带着真相回来。现在开始行动。"]
   ];
   const scene=scenes[briefingStep],card=$("overlay").querySelector(".introCard");
   card.dataset.briefing=briefingStep;
@@ -492,24 +492,23 @@ canvas.addEventListener("click", event => {
 });
 canvas.style.touchAction = "none";
 
-function backstabTarget(){
+function executionTarget(){
  if(!active||modalOpen||melee.active||realm!=="echo")return null;
  let best=null,bestDistance=Infinity;
  for(const state of droneStates){
-  if(state.disabled||state.mode==="chase"||state.suspicion>=.85)continue;
+  if(state.disabled)continue;
   const object=realm==="echo"?state.echoProxy:state.object,dx=camera.position.x-object.position.x,dz=camera.position.z-object.position.z,dist=Math.hypot(dx,dz),air=state.kind==="air";
   if(dist>(air?1.85:1.65)||dist>=bestDistance||(air&&object.position.y>2.65))continue;
-  const dot=(dx*Math.sin(object.rotation.y)+dz*Math.cos(object.rotation.y))/(dist||1);
-  if(dot>-.48||!lineClear(object.position.x,object.position.z,camera.position.x,camera.position.z,false))continue;
+  if(!lineClear(object.position.x,object.position.z,camera.position.x,camera.position.z,false))continue;
   best=state;bestDistance=dist;
  }
  return best;
 }
-function tryBackstab(){
+function tryExecution(){
  if(!active||modalOpen)return;
- if(realm!=="echo"){say("按 Q 扫描敌方投影，再从背后用 V 执行相位处决。",3);return;}
- const target=backstabTarget();
- if(!target){say("需要从背后接近且未被追踪锁定。RX-02 需先用诱饵诱低。",2.2);return;}
+ if(realm!=="echo"){say("按 Q 切入数据位面，靠近侦察兵后按 V 处决。",3);return;}
+ const target=executionTarget();
+ if(!target){say("靠近可触及的侦察兵投影。空中侦察兵可用诱饵引低。",2.2);return;}
  melee.active=true;melee.time=0;melee.target=target;melee.hit=false;keys.clear();
 }
 function spawnImpact(state){
@@ -575,7 +574,7 @@ addEventListener("keydown",event=>{
  if(modalOpen||event.target instanceof HTMLTextAreaElement||event.target instanceof HTMLInputElement)return;
  if(["KeyW","KeyS","KeyA","KeyD","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Space"].includes(event.code))event.preventDefault();
  keys.add(event.code);if(event.repeat)return;
- if(event.code==="KeyT")editWorld();if(event.code==="KeyQ")switchRealm();if(event.code==="KeyF")throwDecoy();if(event.code==="KeyC")toggleCrouch();if(event.code==="KeyV")tryBackstab();
+ if(event.code==="KeyT")editWorld();if(event.code==="KeyQ")switchRealm();if(event.code==="KeyF")throwDecoy();if(event.code==="KeyC")toggleCrouch();if(event.code==="KeyV")tryExecution();
 });
 addEventListener("keyup",event=>{eyeBoss.handleKeyUp(event.code);keys.delete(event.code);});
 addEventListener("blur",()=>{keys.clear();eyeBoss.left=false;eyeBoss.right=false;active=false;if(!won&&!modalOpen&&!relayEnded&&!relayPaused){$("overlay").style.display="flex";$("start").textContent=ready?"继续潜入":"正在载入 Blender 场景…";}});
@@ -590,7 +589,7 @@ document.querySelectorAll("[data-move]").forEach(button=>{
  button.onpointerdown=event=>{event.preventDefault();button.setPointerCapture(event.pointerId);keys.add(button.dataset.move);};
  button.onpointerup=button.onpointercancel=()=>keys.delete(button.dataset.move);
 });
-$("touchQ").onclick=switchRealm;$("touchF").onclick=throwDecoy;$("touchC").onclick=toggleCrouch;$("touchV").onclick=tryBackstab;
+$("touchQ").onclick=switchRealm;$("touchF").onclick=throwDecoy;$("touchC").onclick=toggleCrouch;$("touchV").onclick=tryExecution;
 $("touchE").onpointerdown=event=>{event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);keys.add("KeyE");};
 $("touchE").onpointerup=$("touchE").onpointercancel=()=>keys.delete("KeyE");
 canvas.addEventListener("pointerdown", event => {
@@ -982,7 +981,7 @@ function tick(){
  if(decoyCharges<2){decoyRecharge+=dt;if(decoyRecharge>=11){decoyCharges++;decoyRecharge=0;}}
  if(decoy.active){decoy.time-=dt;decoyRing.scale.setScalar(1+(5.5-decoy.time)*1.25);decoyRing.material.opacity=Math.max(0,decoy.time/5.5)*.7;decoyCore.rotation.y+=dt*4;if(decoy.time<=0){decoy.active=false;decoyVisual.visible=false;}}
  const nearby=interactTarget(),goal=route[stage],nearWrongRealm=goal?distance(goal.x,goal.z)<2.6&&realm!==goal.realm:false;
- meleeCandidate=active&&!melee.active?backstabTarget():null;$("meleePrompt").style.display=meleeCandidate?"flex":"none";
+ meleeCandidate=active&&!melee.active?executionTarget():null;$("meleePrompt").style.display=meleeCandidate?"flex":"none";
  if(meleeCandidate)$("meleePrompt").querySelector("span").textContent=(meleeCandidate.kind==="ground"?"V · 处决 RX-01 投影":"V · 切断 RX-02 数据链路");
  $("prompt").style.display=(nearby||nearWrongRealm)&&active?"block":"none";
  $("interactionLabel").textContent=nearWrongRealm?"Q · 切换到目标位面":nearby?(nearby.verb+(keys.has("KeyE")?" · 接入中":" · 按住")):"";
