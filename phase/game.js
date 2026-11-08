@@ -734,7 +734,7 @@ function buildDigitalRealm(){
  digitalScan=line([new THREE.Vector3(-6.65,.07,-.22),new THREE.Vector3(6.65,.07,-.22),new THREE.Vector3(6.65,.07,.22),new THREE.Vector3(-6.65,.07,.22)],white);
 }
 const drones=[],scouts=[];
-new GLTFLoader().load("level.glb",gltf=>{
+new GLTFLoader().load(new URL("./level.glb",import.meta.url).href,gltf=>{
  scene.add(gltf.scene);gltf.scene.updateMatrixWorld(true);
  gltf.scene.traverse(object=>{
   if(/Reality[ _]barricade|Hazard[ _]strip|barrier[ _]corner|barrier[ _]status|Gate[ _]label/i.test(object.name)){object.userData.device="gate";gateObjects.push({object,baseY:object.position.y});}
@@ -779,7 +779,7 @@ let handModel=null,daggerModel=null;
 function attachHandAssets(){
  if(!handModel)return;viewModel.clear();viewModel.add(handModel);if(daggerModel)viewModel.add(daggerModel);
 }
-new GLTFLoader().load("hands.glb",gltf=>{
+new GLTFLoader().load(new URL("./hands.glb",import.meta.url).href,gltf=>{
  handModel=gltf.scene;
  handModel.traverse(object=>{
   if(!object.isMesh)return;
@@ -790,7 +790,7 @@ new GLTFLoader().load("hands.glb",gltf=>{
  batchRigid(handModel,false,true);
  handModel.traverse(object=>{if(object.isMesh){object.renderOrder=999;object.frustumCulled=false;}});attachHandAssets();
 });
-new GLTFLoader().load("dagger.glb",gltf=>{
+new GLTFLoader().load(new URL("./dagger.glb",import.meta.url).href,gltf=>{
  daggerModel=gltf.scene;daggerModel.traverse(object=>{if(!object.isMesh)return;object.material.depthTest=false;object.material.depthWrite=false;object.material.envMapIntensity=1.1;object.renderOrder=1000;object.frustumCulled=false;});
  batchRigid(daggerModel,false,true);attachHandAssets();
 });
